@@ -20,6 +20,9 @@ module.exports = {
         defaultValue: 'pending'
       },
       payment_proof: Sequelize.STRING,
+      total_price: Sequelize.INTEGER, 
+      proof_image_url: Sequelize.STRING,
+      wa_number: Sequelize.STRING, 
       createdAt: Sequelize.DATE,
       updatedAt: Sequelize.DATE
     });
