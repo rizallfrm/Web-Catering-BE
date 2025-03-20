@@ -1,7 +1,7 @@
-'use strict';
+"use strict";
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('OrderItems', {
+    await queryInterface.createTable("OrderItems", {
       id: {
         type: Sequelize.UUID,
         primaryKey: true,
@@ -10,25 +10,26 @@ module.exports = {
       order_id: {
         type: Sequelize.UUID,
         references: {
-          model: 'Orders',
-          key: 'id'
+          model: "Orders",
+          key: "id",
         },
-        onDelete: 'CASCADE'
+        onDelete: "CASCADE",
       },
       menu_id: {
         type: Sequelize.UUID,
         references: {
-          model: 'Menus',
-          key: 'id'
+          model: "Menus",
+          key: "id",
         },
-        onDelete: 'CASCADE'
+        onDelete: "CASCADE",
       },
       quantity: Sequelize.INTEGER,
+      subtotal: Sequelize.INTEGER,
       createdAt: Sequelize.DATE,
-      updatedAt: Sequelize.DATE
+      updatedAt: Sequelize.DATE,
     });
   },
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.dropTable('OrderItems');
-  }
+    await queryInterface.dropTable("OrderItems");
+  },
 };
