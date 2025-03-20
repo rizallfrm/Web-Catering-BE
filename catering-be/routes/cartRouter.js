@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const cartController  = require('../controllers/cartController');
-const { authenthicate } = require("../middleware/authMiddleware");
+const { authenticate } = require("../middleware/authMiddleware");
 
 //For only user login
-router.use(authenthicate);
+router.use(authenticate);
 
 router.get('/',cartController.getCart);
 router.post('/add',cartController.addItem);

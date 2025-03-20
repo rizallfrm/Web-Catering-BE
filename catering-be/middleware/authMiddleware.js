@@ -2,7 +2,7 @@ require("dotenv").config(); // ini wajib di atas semua!
 
 const jwt = require("jsonwebtoken");
 
-exports.authenthicate = (req, res, next) => {
+exports.authenticate = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   console.log("Auth header:", authHeader);
   
