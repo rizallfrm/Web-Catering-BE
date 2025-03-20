@@ -14,6 +14,12 @@ module.exports = (sequelize, DataTypes) => {
       Order.hasMany(models.OrderItem, { foreignKey: 'order_id' });    }
   }
   Order.init({
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      allowNull: false,
+      primaryKey: true
+    },
     user_id: DataTypes.UUID,
     status: DataTypes.STRING,
     total_price: DataTypes.INTEGER,
