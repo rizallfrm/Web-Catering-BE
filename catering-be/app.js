@@ -19,7 +19,7 @@ const orderRouter = require("./routes/orderRouter");
 app.use('/api/menus', menuRouter);;
 app.use('/api/carts', cartRouter);
 app.use('/api/users/', userRouter);
-// app.use('/api/orders', orderRouter);
+app.use('/api/orders', orderRouter);
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
