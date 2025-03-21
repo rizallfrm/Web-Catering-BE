@@ -11,15 +11,19 @@ app.get("/", (req, res) => {
   res.status(200).send({ message: "Ping Successfully" });
 });
 
+
+//Routes
 const userRouter = require("./routes/userRouter");
 const menuRouter = require("./routes/menuRouter");
 const cartRouter = require("./routes/cartRouter");
 const orderRouter = require("./routes/orderRouter");
+const adminRouter = require("./routes/adminRoutes");
 
 app.use('/api/menus', menuRouter);;
 app.use('/api/carts', cartRouter);
 app.use('/api/users/', userRouter);
 app.use('/api/orders', orderRouter);
+app.use('/api/admin', adminRouter);
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
