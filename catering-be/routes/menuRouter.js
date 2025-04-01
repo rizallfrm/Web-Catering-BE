@@ -6,10 +6,10 @@ router.get("/", menuController.getAll);
 router.get("/:id", menuController.getById);
 
 // Only admin for CRUD menu
-router.post("/", menuController.create);
-router.put("/:id", menuController.update);
-// router.post("/", authenticate, authorize(["admin"]), menuController.create);
-// router.put("/:d", authenticate, authorize(["admin"]), menuController.update);
+// router.post("/", menuController.create);
+// router.put("/:id", menuController.update);
+router.post("/", authenticate, authorize(["admin"]), menuController.create);
+router.put("/:id", authenticate, authorize(["admin"]), menuController.update);
 router.delete(  "/:id",
   authenticate,
   authorize(["admin"]),
