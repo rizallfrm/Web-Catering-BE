@@ -10,7 +10,7 @@ module.exports = {
       name: Sequelize.STRING,
       description: Sequelize.TEXT,
       price: Sequelize.INTEGER,
-      image_url: Sequelize.STRING,
+      image_url: Sequelize.TEXT,
       available: {
         type: Sequelize.BOOLEAN,
         defaultValue: true,
