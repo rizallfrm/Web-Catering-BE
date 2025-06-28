@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
   origin: " *", // Ganti dengan domain frontend kamu
   methods: "GET,POST,PUT,DELETE",
-  allowedHeaders: "Content-Type,Authorization"
+  allowedHeaders: "Content-Type,Authorization",
+  
 }));
  //cors supaya bisa di hit api
 app.use(express.json());
@@ -18,7 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => {
   res.status(200).send({ message: "Ping Successfully" });
 });
-
+app.use('/uploads', express.static('uploads'));
 // Routes
 const userRouter = require("./routes/userRouter");
 const menuRouter = require("./routes/menuRouter");
