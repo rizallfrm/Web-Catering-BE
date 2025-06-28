@@ -1,6 +1,14 @@
 const { v4: uuidv4 } = require("uuid");
 const { Order, OrderItem, Cart, CartItem, Menu, User } = require("../models");
+const ImageKit = require("imagekit");
 
+
+
+const imagekit = new ImageKit({
+  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+  urlEndpoint: process.env.URL_ENDPOINT,
+});
 module.exports = {
   checkout: async (req, res) => {
     const cart = await Cart.findOne({
@@ -16,7 +24,7 @@ module.exports = {
       user_id: req.user.id,
       status: "pending",
       total_price: 0, // akan diupdate
-      payment_proof_url: "", // kirim manual via WhatsApp
+      proof_image_url: "", // kirim manual via WhatsApp
     });
 
     let total = 0;
@@ -41,23 +49,33 @@ module.exports = {
     res.status(201).json({
       status: "success",
       message: "Order created! Silakan kirim bukti via WhatsApp",
-      data: { order },
+      data: {
+        order: {
+          id: order.id,
+          proof_image_url: order.proof_image_url,
+        },
+      },
     });
   },
 
   getMyOrders: async (req, res) => {
     try {
-      console.log("User ID:", req.user.id);
-
-      // First, try a simple query without includes
       const orders = await Order.findAll({
         where: { user_id: req.user.id },
         order: [["createdAt", "DESC"]],
+        include: [
+          {
+            model: OrderItem,
+            include: [
+              {
+                model: Menu,
+                attributes: ["id", "name", "price", "image_url"],
+              },
+            ],
+          },
+        ],
       });
 
-      console.log("Found orders:", orders.length);
-
-      // Return basic data
       res.status(200).json({
         status: "success",
         message: "Orders retrieved successfully",
@@ -69,10 +87,71 @@ module.exports = {
         status: "error",
         message: "Failed to retrieve orders",
         error: error.message,
-        stack: error.stack,
       });
     }
   },
+  uploadPaymentProof: async (req, res) => {
+    try {
+      console.log('File received:', req.file); // Debug file upload
+      
+      if (!req.file) {
+        return res.status(400).json({
+          status: "error",
+          message: "File bukti pembayaran diperlukan"
+        });
+      }
+
+      // Konversi file buffer untuk ImageKit
+      const fileBuffer = req.file.buffer || fs.readFileSync(req.file.path);
+      
+      // Upload ke ImageKit
+      const uploadResponse = await imagekit.upload({
+        file: fileBuffer,
+        fileName: `payment_${Date.now()}_${req.file.originalname}`,
+        folder: "/payment_proofs",
+        useUniqueFileName: true
+      });
+
+      console.log('ImageKit upload response:', uploadResponse); // Debug
+
+      // Update database dengan URL dari ImageKit
+      const updatedOrder = await Order.update(
+        { proof_image_url: uploadResponse.url },
+        { 
+          where: { id: req.params.id },
+          returning: true 
+        }
+      );
+
+      // Hapus file temporary jika menggunakan diskStorage
+      if (req.file.path) {
+        fs.unlinkSync(req.file.path);
+      }
+
+      res.status(200).json({
+        status: "success",
+        message: "Bukti pembayaran berhasil diupload",
+        data: {
+          proof_image_url: uploadResponse.url
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in uploadPaymentProof:', error);
+      
+      // Hapus file temporary jika error
+      if (req.file?.path) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      res.status(500).json({
+        status: "error",
+        message: error.message || "Gagal mengupload bukti pembayaran"
+      });
+    }
+  },
+
+  // orderController.js
   getOrderById: async (req, res) => {
     try {
       const order = await Order.findOne({
@@ -86,7 +165,7 @@ module.exports = {
             include: [
               {
                 model: Menu,
-                attributes: ["id", "name", "price", "image_url",],
+                attributes: ["id", "name", "price", "image_url"],
               },
             ],
           },
@@ -102,7 +181,12 @@ module.exports = {
 
       res.status(200).json({
         status: "success",
-        data: { order },
+        data: {
+          order: {
+            ...order.toJSON(),
+            payment_proof_url: order.payment_proof_url,
+          },
+        },
       });
     } catch (error) {
       console.error("Error getting order details:", error);
@@ -196,7 +280,7 @@ module.exports = {
             include: [
               {
                 model: Menu,
-                attributes: ["id", "name", "price", "image_url",],
+                attributes: ["id", "name", "price", "image_url"],
               },
             ],
           },
