@@ -24,42 +24,51 @@ module.exports = {
   },
 
   getAllOrders: async (req, res) => {
-    try {
-      const orders = await Order.findAll({
-        include: [
-          {
-            model: User,
-            attributes: ["id", "name", "email"],
-          },
-          {
-            model: OrderItem,
-            include: [
-              {
-                model: Menu,
-                attributes: ["id", "name", "price", "image_url"],
-              },
-            ],
-          },
-        ],
-        order: [["createdAt", "DESC"]],
-      });
-
-      res.status(200).json({
-        status: "success",
-        message: "All orders retrieved successfully",
-        data: {
-          orders: orders,
+  try {
+    const orders = await Order.findAll({
+      include: [
+        {
+          model: User,
+          attributes: ["id", "name", "email"],
         },
-      });
-    } catch (error) {
-      console.error("Error getting all orders:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve orders",
-        error: error.message,
-      });
-    }
-  },
+        {
+          model: OrderItem,
+          include: [
+            {
+              model: Menu,
+              attributes: ["id", "name", "price", "image_url"],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      attributes: {
+        include: ["proof_image_url"] // Pastikan field ini termasuk
+      }
+    });
+
+    // Format response untuk konsistensi
+    const formattedOrders = orders.map(order => ({
+      ...order.toJSON(),
+      payment_proof: order.proof_image_url // Buat alias untuk frontend
+    }));
+
+    res.status(200).json({
+      status: "success",
+      message: "All orders retrieved successfully",
+      data: {
+        orders: formattedOrders,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting all orders:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve orders",
+      error: error.message,
+    });
+  }
+},
 
   deleteUser: async (req, res) => {
     try {
