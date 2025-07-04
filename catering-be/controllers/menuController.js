@@ -20,15 +20,16 @@ module.exports = {
     }
   },
 
-  getById: async (req, res) => { 
+  getById: async (req, res) => {
     try {
       const menu = await Menu.findByPk(req.params.id);
-      if(!menu) return res.status(404).json({ 
-        status: "Error",
-        isSuccess: false,
-        message: "Menu not found!" 
-      });
-      
+      if (!menu)
+        return res.status(404).json({
+          status: "Error",
+          isSuccess: false,
+          message: "Menu not found!",
+        });
+
       res.status(200).json({
         status: "Success",
         isSuccess: true,
@@ -38,17 +39,25 @@ module.exports = {
     } catch (error) {
       console.error("Error getting menu by id:", error);
       res.status(500).json({
-        status: "Error", 
+        status: "Error",
         isSuccess: false,
-        message: "Failed to get menu"
+        message: "Failed to get menu",
       });
     }
   },
 
   create: async (req, res) => {
     try {
-      const { name, description, price, image_url } = req.body;
-      
+      const {
+        name,
+        description,
+        price,
+        image_url,
+        min_order ,
+        available,
+        category,
+      } = req.body;
+
       // Validasi data
       if (!name) {
         return res.status(400).json({
@@ -57,7 +66,7 @@ module.exports = {
           message: "Name is required",
         });
       }
-      
+
       if (!price) {
         return res.status(400).json({
           status: "Error",
@@ -65,24 +74,28 @@ module.exports = {
           message: "Price is required",
         });
       }
-      
+
       // Validasi panjang URL gambar jika ada
-      const processedImageUrl = image_url && image_url.length > 250 
-        ? image_url.substring(0, 250) 
-        : image_url;
-      
-      const menu = await Menu.create({ 
-        name, 
-        description, 
-        price, 
-        image_url: processedImageUrl 
+      const processedImageUrl =
+        image_url && image_url.length > 250
+          ? image_url.substring(0, 250)
+          : image_url;
+
+      const menu = await Menu.create({
+        name,
+        description,
+        price,
+        min_order,
+        available,
+        category,
+        image_url: processedImageUrl,
       });
-      
+
       res.status(201).json({
         status: "Success",
         isSuccess: true,
         message: "Success create menu",
-        data: { menu }
+        data: { menu },
       });
     } catch (error) {
       console.error("Error creating menu:", error);
@@ -94,24 +107,24 @@ module.exports = {
     }
   },
 
-  update: async (req, res) => { 
+  update: async (req, res) => {
     try {
       const menu = await Menu.findByPk(req.params.id);
-      if(!menu) {
-        return res.status(404).json({ 
+      if (!menu) {
+        return res.status(404).json({
           status: "Error",
           isSuccess: false,
-          message: "Menu not found!" 
+          message: "Menu not found!",
         });
       }
-      
+
       // Validasi panjang URL gambar jika ada
       if (req.body.image_url && req.body.image_url.length > 250) {
         req.body.image_url = req.body.image_url.substring(0, 250);
       }
-      
+
       await menu.update(req.body);
-      
+
       res.status(200).json({
         status: "Success",
         isSuccess: true,
@@ -127,20 +140,20 @@ module.exports = {
       });
     }
   },
-  
-  delete: async (req, res) => { 
+
+  delete: async (req, res) => {
     try {
       const menu = await Menu.findByPk(req.params.id);
-      if(!menu) {
-        return res.status(404).json({ 
+      if (!menu) {
+        return res.status(404).json({
           status: "Error",
           isSuccess: false,
-          message: "Menu not found!" 
+          message: "Menu not found!",
         });
       }
 
       await menu.destroy();
-      
+
       res.status(200).json({
         status: "Success",
         isSuccess: true,
@@ -149,10 +162,10 @@ module.exports = {
     } catch (error) {
       console.error("Error deleting menu:", error);
       res.status(500).json({
-        status: "Error", 
+        status: "Error",
         isSuccess: false,
-        message: "Failed to delete menu"
+        message: "Failed to delete menu",
       });
     }
-  }
+  },
 };
