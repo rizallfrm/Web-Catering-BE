@@ -16,6 +16,9 @@ router.get("/users", adminController.getAllUsers);
 router.delete("/users/:id", adminController.deleteUser);
 
 // Order Management
-router.get("/orders", adminController.getAllOrders);
+router.get("/orders", orderController.getAllOrders);
+router.put("/orders/:id/confirm", orderController.confirmOrder)
+router.put("/orders/:id/verify-payment", orderController.verifyPayment)
+router.put("/orders/:id/delivery-status", orderController.updateDeliveryStatus)
 
 module.exports = router;
