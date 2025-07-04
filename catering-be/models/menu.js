@@ -20,10 +20,12 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
       name: DataTypes.STRING,
+      category: DataTypes.STRING,
       description: DataTypes.TEXT,
       price: DataTypes.INTEGER,
       image_url: DataTypes.TEXT,
       available: DataTypes.BOOLEAN,
+      min_order: DataTypes.INTEGER,
     },
     {
       sequelize,
