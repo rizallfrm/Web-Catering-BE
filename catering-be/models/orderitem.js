@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       order_id: DataTypes.UUID,
       menu_id: DataTypes.UUID,
       quantity: DataTypes.INTEGER,
-      price: DataTypes.INTEGER, // Add this field to match what your controller uses
+      price: DataTypes.INTEGER, 
       subtotal: DataTypes.INTEGER,
     },
     {
