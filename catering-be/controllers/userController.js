@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 module.exports = {
   register: async (req, res) => {
     try {
-      const { firstName, lastName, email, password, phone } = req.body;
+      const { firstName, lastName, email, password, phone,address } = req.body;
       
       // Validasi input
       if (!firstName || !email || !password) {
@@ -22,6 +22,7 @@ module.exports = {
       const user = await User.create({
         name,
         email,
+        address,
         password: hash,
         phone: phone || null,
         role: "user",
@@ -34,6 +35,8 @@ module.exports = {
           id: user.id,
           name: user.name,
           email: user.email,
+          address: user.address,
+          phone: user.phone,
           role: user.role
         }
       });
