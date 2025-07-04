@@ -10,7 +10,7 @@ module.exports = {
     await queryInterface.bulkInsert('Users', [{
       id: uuidv4(),
       name: 'Super Admin',
-      email: 'admin@example.com',
+      email: 'admin@gmail.com',
       password: hashedPassword,
       phone: '08123456789',
       address: 'Admin HQ',
@@ -21,6 +21,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete('Users', { email: 'admin@example.com' }, {});
+    await queryInterface.bulkDelete('Users', { email: 'admin@gmail.com' }, {});
   }
 };
