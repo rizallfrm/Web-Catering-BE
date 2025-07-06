@@ -19,6 +19,7 @@ module.exports = {
         type: Sequelize.ENUM(
           "Menunggu Konfirmasi",
           "Dikonfirmasi",
+          "Menunggu Verifikasi",
           "Diproses",
           "Dikirim",
           "Selesai",
@@ -38,7 +39,10 @@ module.exports = {
       payment_proof: Sequelize.STRING,
       total_price: Sequelize.INTEGER,
       proof_image_url: Sequelize.STRING,
-
+      weekly_schedule: {
+        type: Sequelize.JSON,
+        defaultValue: null,
+      },
       delivery_date: Sequelize.DATE,
       delivery_address: Sequelize.STRING,
       delivery_status: {
