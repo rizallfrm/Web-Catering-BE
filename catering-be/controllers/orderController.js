@@ -13,8 +13,40 @@ module.exports = {
   checkout: async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { delivery_date, wa_number, delivery_address, notes, items } =
-        req.body;
+      const {
+        delivery_date,
+        wa_number,
+        delivery_address,
+        notes,
+        items,
+        weekly_schedule,
+      } = req.body;
+      if (!wa_number || !delivery_address) {
+        await transaction.rollback();
+        return res.status(400).json({
+          status: "error",
+          message: "WA number and address are required",
+        });
+      }
+
+      // Validasi khusus untuk pesanan harian
+      if (weekly_schedule && weekly_schedule.length > 0) {
+        if (weekly_schedule.some((day) => !day.date || !day.time)) {
+          await transaction.rollback();
+          return res.status(400).json({
+            status: "error",
+            message: "All selected days must have date and time",
+          });
+        }
+      } else if (!delivery_date) {
+        // Validasi untuk pesanan biasa
+        await transaction.rollback();
+        return res.status(400).json({
+          status: "error",
+          message: "Delivery date is required for regular orders",
+        });
+      }
+
       // Pastikan user ada
       const user = await User.findByPk(req.user.id, { transaction });
       if (!user) {
@@ -93,11 +125,12 @@ module.exports = {
           payment_status: "Belum Bayar",
           total_price: 0,
           proof_image_url: null,
-          delivery_date,
+          delivery_date: weekly_schedule?.[0]?.datetime || delivery_date,
           wa_number,
           delivery_address,
           delivery_notes: notes,
           delivery_status: "Menunggu Jadwal",
+          weekly_schedule: weekly_schedule || null,
         },
         { transaction }
       );
@@ -246,6 +279,7 @@ module.exports = {
       await order.update({
         proof_image_url: uploadResponse.url,
         payment_status: "Menunggu Verifikasi",
+        status: "Menunggu Verifikasi",
       });
 
       // Hapus file temporary jika ada
@@ -369,50 +403,62 @@ module.exports = {
   },
 
   getOrderById: async (req, res) => {
-    try {
-      const order = await Order.findOne({
-        where: {
-          id: req.params.id,
-          user_id: req.user.id,
+  try {
+    const order = await Order.findOne({
+      where: {
+        id: req.params.id,
+        user_id: req.user.id,
+      },
+      include: [
+        {
+          model: OrderItem,
+          include: [
+            {
+              model: Menu,
+              attributes: ["id", "name", "price", "image_url"],
+            },
+          ],
         },
-        include: [
-          {
-            model: OrderItem,
-            include: [
-              {
-                model: Menu,
-                attributes: ["id", "name", "price", "image_url"],
-              },
-            ],
-          },
-        ],
-      });
-
-      if (!order) {
-        return res.status(404).json({
-          status: "error",
-          message: "Order not found",
-        });
-      }
-
-      res.status(200).json({
-        status: "success",
-        data: {
-          order: {
-            ...order.toJSON(),
-            payment_proof_url: order.payment_proof_url,
-          },
+        {
+          model: User,
+          attributes: ["name", "phone", "address"],
         },
-      });
-    } catch (error) {
-      console.error("Error getting order details:", error);
-      res.status(500).json({
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
         status: "error",
-        message: "Failed to retrieve order details",
-        error: error.message,
+        message: "Order not found",
       });
     }
-  },
+
+    // Handle weekly_schedule - parse jika string, biarkan jika sudah object
+    const orderData = order.toJSON();
+    if (orderData.weekly_schedule && typeof orderData.weekly_schedule === 'string') {
+      try {
+        orderData.weekly_schedule = JSON.parse(orderData.weekly_schedule);
+      } catch (parseError) {
+        console.error("Error parsing weekly_schedule:", parseError);
+        orderData.weekly_schedule = null;
+      }
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        order: orderData 
+      },
+    });
+  } catch (error) {
+    console.error("Error getting order details:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve order details",
+      error: error.message,
+    });
+  }
+},
 
   // Update Status Order
   updateStatus: async (req, res) => {
@@ -425,6 +471,7 @@ module.exports = {
       const allowedStatuses = [
         "Menunggu Konfirmasi",
         "Dikonfirmasi",
+        "Mwnunggu Verifikasi",
         "Diproses",
         "Dikirim",
         "Selesai",
@@ -533,7 +580,7 @@ module.exports = {
       }
 
       // Check if the order is in 'pending' status
-      if (order.status !== "pending") {
+      if (order.status !== "Menunggu Konfirmasi") {
         return res.status(400).json({
           status: "error",
           message: "Only pending orders can be cancelled",
@@ -541,7 +588,7 @@ module.exports = {
       }
 
       // Update the order status to 'cancelled'
-      await order.update({ status: "cancelled" });
+      await order.update({ status: "Dibatalkan" });
 
       res.status(200).json({
         status: "success",
