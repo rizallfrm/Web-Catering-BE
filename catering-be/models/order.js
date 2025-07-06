@@ -25,6 +25,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM(
           "Menunggu Konfirmasi",
           "Dikonfirmasi",
+          "Menunggu Verifikasi",
           "Diproses",
           "Dikirim",
           "Selesai",
@@ -44,7 +45,10 @@ module.exports = (sequelize, DataTypes) => {
       total_price: DataTypes.INTEGER,
       proof_image_url: DataTypes.STRING,
       wa_number: DataTypes.STRING,
-
+      weekly_schedule: {
+        type: DataTypes.JSON, 
+        defaultValue: null, 
+      },
       delivery_date: DataTypes.DATE,
       delivery_address: DataTypes.STRING,
       delivery_status: {
