@@ -5,7 +5,7 @@ const { authenticate, authorize } = require("../middleware/authMiddleware");
 const upload = require("../config/multerConfig");
 
 router.use(authenticate);
-// User routes
+// User route
 router.post("/checkout", orderController.checkout);
 router.get("/my-orders", orderController.getMyOrders);
 router.get("/:id", orderController.getOrderById);
