@@ -43,6 +43,30 @@ module.exports = {
         type: Sequelize.JSON,
         defaultValue: null,
       },
+      
+      // TAMBAHAN: Ongkir fields
+      delivery_fee: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+        comment: "Biaya pengiriman"
+      },
+      delivery_area: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: "Area pengiriman yang terdeteksi"
+      },
+      delivery_confidence: {
+        type: Sequelize.ENUM('high', 'medium', 'low', 'none'),
+        defaultValue: 'none',
+        comment: "Tingkat kepercayaan deteksi area"
+      },
+      delivery_method: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: "Metode deteksi yang digunakan"
+      },
+      
+      // Existing delivery fields
       delivery_date: Sequelize.DATE,
       delivery_address: Sequelize.STRING,
       delivery_status: {
@@ -73,6 +97,10 @@ module.exports = {
     );
     await queryInterface.sequelize.query(
       'DROP TYPE IF EXISTS "enum_Orders_delivery_status";'
+    );
+    // TAMBAHAN: Drop enum untuk delivery_confidence
+    await queryInterface.sequelize.query(
+      'DROP TYPE IF EXISTS "enum_Orders_delivery_confidence";'
     );
   },
 };
