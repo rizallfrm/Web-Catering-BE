@@ -1,4 +1,3 @@
-"use strict";
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable("Users", {
@@ -8,10 +7,16 @@ module.exports = {
         defaultValue: Sequelize.UUIDV4,
       },
       name: {
-        type: Sequelize.STRING,
+        type: Sequelize.STRING, // Fixed: Gunakan Sequelize.STRING bukan DataTypes.STRING
         allowNull: false,
         validate: {
-          notEmpty: true,
+          notEmpty: {
+            msg: "Nama tidak boleh kosong"
+          },
+          len: {
+            args: [2, 100],
+            msg: "Nama harus antara 2-100 karakter"
+          }
         },
       },
       email: {
@@ -25,6 +30,14 @@ module.exports = {
       role: {
         type: Sequelize.STRING,
         defaultValue: "user",
+      },
+      isActive: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
+      },
+      lastLoginAt: {
+        type: Sequelize.DATE,
+        allowNull: true,
       },
       createdAt: Sequelize.DATE,
       updatedAt: Sequelize.DATE,
