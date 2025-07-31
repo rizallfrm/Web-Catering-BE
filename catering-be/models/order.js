@@ -46,9 +46,34 @@ module.exports = (sequelize, DataTypes) => {
       proof_image_url: DataTypes.STRING,
       wa_number: DataTypes.STRING,
       weekly_schedule: {
-        type: DataTypes.JSON, 
-        defaultValue: null, 
+        type: DataTypes.JSON,
+        defaultValue: null,
       },
+
+      //ongkir
+      delivery_fee: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: "Biaya pengiriman",
+      },
+      delivery_area: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: "Area pengiriman yang terdeteksi",
+      },
+      delivery_confidence: {
+        type: DataTypes.ENUM("high", "medium", "low", "none"),
+        defaultValue: "none",
+        comment: "Tingkat kepercayaan deteksi area",
+      },
+      delivery_method: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: "Metode deteksi yang digunakan",
+      },
+
+      
+      // pengiriman
       delivery_date: DataTypes.DATE,
       delivery_address: DataTypes.STRING,
       delivery_status: {
@@ -63,6 +88,9 @@ module.exports = (sequelize, DataTypes) => {
       },
       delivery_notes: DataTypes.TEXT,
     },
+
+    //ongkir
+
     {
       sequelize,
       modelName: "Order",
