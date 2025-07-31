@@ -1,14 +1,16 @@
 const { v4: uuidv4 } = require("uuid");
 const db = require("../models/index");
-
-const { Order, OrderItem, Cart, CartItem, Menu, User, sequelize } = db;
+const AddressOngkirService = require("../services/addressOngkirService");
 const ImageKit = require("imagekit");
+const { Order, OrderItem, Cart, CartItem, Menu, User, sequelize } = db;
 
+const ongkirService = new AddressOngkirService();
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
   urlEndpoint: process.env.URL_ENDPOINT,
 });
+
 module.exports = {
   checkout: async (req, res) => {
     const transaction = await sequelize.transaction();
@@ -17,16 +19,57 @@ module.exports = {
         delivery_date,
         wa_number,
         delivery_address,
+        delivery_fee,
         notes,
         items,
         weekly_schedule,
       } = req.body;
+
+      // Validasi data wajib
       if (!wa_number || !delivery_address) {
         await transaction.rollback();
         return res.status(400).json({
           status: "error",
           message: "WA number and address are required",
         });
+      }
+
+      // Auto-detect ongkir jika tidak dikirim dari frontend
+      let calculatedDeliveryFee = 0;
+      let detectedArea = null;
+      let deliveryConfidence = "none";
+      let deliveryMethod = "auto_detect";
+
+      if (delivery_fee !== undefined) {
+        // Validasi delivery_fee yang dikirim frontend
+        const ongkirResult =
+          ongkirService.detectOngkirFromAddress(delivery_address);
+        const expectedFee = ongkirResult.fee;
+        const receivedFee = parseInt(delivery_fee) || 0;
+
+        if (Math.abs(receivedFee - expectedFee) > 1000) {
+          // Toleransi 1000 rupiah
+          await transaction.rollback();
+          return res.status(400).json({
+            status: "error",
+            message: `Delivery fee mismatch. Expected: ${expectedFee}, Received: ${receivedFee}`,
+            expected_fee: expectedFee,
+            detected_area: ongkirResult.area_name,
+          });
+        }
+
+        calculatedDeliveryFee = receivedFee;
+        detectedArea = ongkirResult.area_name;
+        deliveryConfidence = ongkirResult.confidence;
+        deliveryMethod = ongkirResult.detection_method;
+      } else {
+        // Auto detect jika tidak ada delivery_fee
+        const ongkirResult =
+          ongkirService.detectOngkirFromAddress(delivery_address);
+        calculatedDeliveryFee = ongkirResult.fee;
+        detectedArea = ongkirResult.area_name;
+        deliveryConfidence = ongkirResult.confidence;
+        deliveryMethod = ongkirResult.detection_method;
       }
 
       // Validasi khusus untuk pesanan harian
@@ -62,16 +105,9 @@ module.exports = {
         user: req.user,
         body: req.body,
         cartItems: items,
+        calculatedDeliveryFee,
+        detectedArea,
       });
-
-      // Validasi data pengiriman
-      if (!delivery_date || !wa_number || !delivery_address) {
-        await transaction.rollback();
-        return res.status(400).json({
-          status: "error",
-          message: "Delivery date, WA number, and address are required",
-        });
-      }
 
       // Validasi items dari frontend
       if (!items || items.length === 0) {
@@ -116,6 +152,16 @@ module.exports = {
         }
       }
 
+      // Hitung total menu
+      let menuTotal = 0;
+      for (const item of items) {
+        const menu = menus.find((m) => m.id === item.menu_id);
+        menuTotal += menu.price * item.quantity;
+      }
+
+      // Total keseluruhan (menu + ongkir)
+      const totalPrice = menuTotal + calculatedDeliveryFee;
+
       // Buat order
       const order = await Order.create(
         {
@@ -123,7 +169,7 @@ module.exports = {
           user_id: req.user.id,
           status: "Menunggu Konfirmasi",
           payment_status: "Belum Bayar",
-          total_price: 0,
+          total_price: totalPrice,
           proof_image_url: null,
           delivery_date: weekly_schedule?.[0]?.datetime || delivery_date,
           wa_number,
@@ -131,15 +177,18 @@ module.exports = {
           delivery_notes: notes,
           delivery_status: "Menunggu Jadwal",
           weekly_schedule: weekly_schedule || null,
+          // Tambahan field ongkir
+          delivery_fee: calculatedDeliveryFee,
+          delivery_area: detectedArea,
+          delivery_confidence: deliveryConfidence,
+          delivery_method: deliveryMethod,
         },
         { transaction }
       );
 
-      // Hitung total dan buat order items
-      let total = 0;
+      // Buat order items
       for (const item of items) {
         const menu = menus.find((m) => m.id === item.menu_id);
-        total += menu.price * item.quantity;
         await OrderItem.create(
           {
             id: uuidv4(),
@@ -152,13 +201,21 @@ module.exports = {
         );
       }
 
-      await order.update({ total_price: total }, { transaction });
       await transaction.commit();
 
       res.status(201).json({
         status: "success",
         message: "Pesanan berhasil dibuat, menunggu konfirmasi admin",
-        data: { order },
+        data: {
+          order,
+          breakdown: {
+            menu_total: menuTotal,
+            delivery_fee: calculatedDeliveryFee,
+            total_price: totalPrice,
+            detected_area: detectedArea,
+            delivery_confidence: deliveryConfidence,
+          },
+        },
       });
     } catch (error) {
       await transaction.rollback();
@@ -170,6 +227,7 @@ module.exports = {
       });
     }
   },
+
   // Fungsi untuk admin mengkonfirmasi pesanan
   confirmOrder: async (req, res) => {
     try {
@@ -188,9 +246,6 @@ module.exports = {
         status: "Dikonfirmasi",
         // Tambahkan field admin_id jika perlu melacak admin yang mengkonfirmasi
       });
-
-      // Kirim notifikasi ke customer untuk melakukan pembayaran
-      // Implementasi notifikasi tergantung sistem Anda (WhatsApp/email/SMS)
 
       res.status(200).json({
         status: "success",
@@ -220,6 +275,10 @@ module.exports = {
                 model: Menu,
                 attributes: ["id", "name", "price", "image_url"],
               },
+              {
+                model: Order,
+                attributes: ["delivery_fee", "delivery_area"],
+              },
             ],
           },
           {
@@ -243,7 +302,8 @@ module.exports = {
       });
     }
   },
-  // Fungsi untuk customer mengupload bukti pembayaran
+
+  // Upload payment proof dan fungsi lainnya tetap sama...
   uploadPaymentProof: async (req, res) => {
     try {
       const order = await Order.findOne({
@@ -285,8 +345,6 @@ module.exports = {
       // Hapus file temporary jika ada
       if (req.file.path) fs.unlinkSync(req.file.path);
 
-      // Notifikasi admin untuk verifikasi pembayaran
-
       res.status(200).json({
         status: "success",
         message: "Payment proof uploaded successfully",
@@ -303,8 +361,7 @@ module.exports = {
     }
   },
 
-  // Fungsi untuk admin memverifikasi pembayaran
-  // Verify Payment
+  // Sisa method tetap sama seperti verifyPayment, updateDeliveryStatus, dll...
   verifyPayment: async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
@@ -326,7 +383,6 @@ module.exports = {
         });
       }
 
-      // Update status pembayaran dan order
       await order.update(
         {
           payment_status: "Sudah Dibayar",
@@ -337,13 +393,6 @@ module.exports = {
       );
 
       await transaction.commit();
-
-      // // Kirim notifikasi ke user
-      // await sendNotification(order.user_id, {
-      //   title: "Pembayaran Diverifikasi",
-      //   message: `Pembayaran untuk pesanan #${order.id} telah diverifikasi`,
-      //   type: "payment_verified",
-      // });
 
       res.status(200).json({
         status: "success",
@@ -360,7 +409,7 @@ module.exports = {
       });
     }
   },
-  // Fungsi untuk update status pengiriman
+
   updateDeliveryStatus: async (req, res) => {
     try {
       const { status } = req.body;
@@ -382,7 +431,6 @@ module.exports = {
 
       await order.update({ delivery_status: status });
 
-      // Jika status pengiriman berubah menjadi "Terkirim", update juga status order
       if (status === "Terkirim") {
         await order.update({ status: "Selesai" });
       }
@@ -403,75 +451,79 @@ module.exports = {
   },
 
   getOrderById: async (req, res) => {
-  try {
-    const order = await Order.findOne({
-      where: {
-        id: req.params.id,
-        user_id: req.user.id,
-      },
-      include: [
-        {
-          model: OrderItem,
-          include: [
-            {
-              model: Menu,
-              attributes: ["id", "name", "price", "image_url"],
-            },
-          ],
+    try {
+      const order = await Order.findOne({
+        where: {
+          id: req.params.id,
+          user_id: req.user.id,
         },
-        {
-          model: User,
-          attributes: ["name", "phone", "address"],
-        },
-      ],
-    });
+        include: [
+          {
+            model: OrderItem,
+            include: [
+              {
+                model: Menu,
+                attributes: ["id", "name", "price", "image_url"],
+              },
+              {
+                model: Order,
+                attributes: ["delivery_fee", "delivery_area"],
+              },
+            ],
+          },
+          {
+            model: User,
+            attributes: ["name", "phone", "address"],
+          },
+        ],
+      });
 
-    if (!order) {
-      return res.status(404).json({
+      if (!order) {
+        return res.status(404).json({
+          status: "error",
+          message: "Order not found",
+        });
+      }
+
+      const orderData = order.toJSON();
+      if (
+        orderData.weekly_schedule &&
+        typeof orderData.weekly_schedule === "string"
+      ) {
+        try {
+          orderData.weekly_schedule = JSON.parse(orderData.weekly_schedule);
+        } catch (parseError) {
+          console.error("Error parsing weekly_schedule:", parseError);
+          orderData.weekly_schedule = null;
+        }
+      }
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          order: orderData,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting order details:", error);
+      res.status(500).json({
         status: "error",
-        message: "Order not found",
+        message: "Failed to retrieve order details",
+        error: error.message,
       });
     }
+  },
 
-    // Handle weekly_schedule - parse jika string, biarkan jika sudah object
-    const orderData = order.toJSON();
-    if (orderData.weekly_schedule && typeof orderData.weekly_schedule === 'string') {
-      try {
-        orderData.weekly_schedule = JSON.parse(orderData.weekly_schedule);
-      } catch (parseError) {
-        console.error("Error parsing weekly_schedule:", parseError);
-        orderData.weekly_schedule = null;
-      }
-    }
-
-    res.status(200).json({
-      status: "success",
-      data: {
-        order: orderData 
-      },
-    });
-  } catch (error) {
-    console.error("Error getting order details:", error);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve order details",
-      error: error.message,
-    });
-  }
-},
-
-  // Update Status Order
   updateStatus: async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
       const { id } = req.params;
       const { status } = req.body;
 
-      // Validasi status
       const allowedStatuses = [
         "Menunggu Konfirmasi",
         "Dikonfirmasi",
-        "Mwnunggu Verifikasi",
+        "Menunggu Verifikasi",
         "Diproses",
         "Dikirim",
         "Selesai",
@@ -486,7 +538,6 @@ module.exports = {
         });
       }
 
-      // Temukan order
       const order = await Order.findByPk(id, { transaction });
       if (!order) {
         await transaction.rollback();
@@ -496,7 +547,6 @@ module.exports = {
         });
       }
 
-      // Validasi alur status
       if (status === "Dikonfirmasi" && order.payment_status !== "Belum Bayar") {
         await transaction.rollback();
         return res.status(400).json({
@@ -505,19 +555,9 @@ module.exports = {
         });
       }
 
-      // Update status
       await order.update({ status }, { transaction });
 
-      // Handle status khusus
-      if (status === "Dikonfirmasi") {
-        // Kirim notifikasi ke user untuk upload bukti bayar
-        // await sendNotification(order.user_id, {
-        //   title: "Pesanan Dikonfirmasi",
-        //   message: `Silakan upload bukti pembayaran untuk pesanan #${order.id}`,
-        //   type: "order_confirmed",
-        // });
-      } else if (status === "Diproses") {
-        // Pastikan pembayaran sudah diverifikasi
+      if (status === "Diproses") {
         if (order.payment_status !== "Sudah Dibayar") {
           await transaction.rollback();
           return res.status(400).json({
@@ -563,6 +603,7 @@ module.exports = {
       });
     }
   },
+
   cancelOrder: async (req, res) => {
     try {
       const order = await Order.findOne({
@@ -579,7 +620,6 @@ module.exports = {
         });
       }
 
-      // Check if the order is in 'pending' status
       if (order.status !== "Menunggu Konfirmasi") {
         return res.status(400).json({
           status: "error",
@@ -587,7 +627,6 @@ module.exports = {
         });
       }
 
-      // Update the order status to 'cancelled'
       await order.update({ status: "Dibatalkan" });
 
       res.status(200).json({
